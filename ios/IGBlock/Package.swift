@@ -16,7 +16,8 @@ let package = Package(
     targets: [
         .target(
             name: "IGBlock",
-            dependencies: ["IGBlockCore"]
+            dependencies: ["IGBlockCore"],
+            resources: [.copy("route_shim.js")]
         ),
     ]
 )
