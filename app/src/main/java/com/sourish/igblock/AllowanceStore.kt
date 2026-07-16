@@ -16,14 +16,14 @@ class SharedPreferencesAllowanceStore(context: Context) : AllowanceStore {
         prefs.getInt(KEY_REMAINING_SECONDS, DEFAULT_DAILY_ALLOWANCE_SECONDS)
 
     override fun setRemainingSeconds(seconds: Int) {
-        prefs.edit().putInt(KEY_REMAINING_SECONDS, seconds).apply()
+        prefs.edit().putInt(KEY_REMAINING_SECONDS, seconds).commit()
     }
 
     override fun getLastResetEpochDay(): Long =
         prefs.getLong(KEY_LAST_RESET_EPOCH_DAY, -1L)
 
     override fun setLastResetEpochDay(epochDay: Long) {
-        prefs.edit().putLong(KEY_LAST_RESET_EPOCH_DAY, epochDay).apply()
+        prefs.edit().putLong(KEY_LAST_RESET_EPOCH_DAY, epochDay).commit()
     }
 
     companion object {

@@ -2,7 +2,6 @@ package com.sourish.igblock
 
 import android.os.Bundle
 import android.os.CountDownTimer
-import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -14,6 +13,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var allowanceTracker: AllowanceTracker
     private var countdownTimer: CountDownTimer? = null
     private var overlayShown = false
+    private var lastKnownPath: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity() {
         webView = findViewById(R.id.webview)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        webView.settings.allowFileAccess = false
 
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
@@ -40,14 +41,14 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl("https://www.instagram.com")
     }
 
-    private fun onRouteChanged(path: String) {
-        Log.d("MainActivity", "route changed: $path")
+    private fun onRouteChanged(path: String) = runOnUiThread {
+        lastKnownPath = path
         allowanceTracker.resetIfNewDay()
 
         if (!RouteClassifier.isRestricted(path)) {
             stopCountdown()
             hideOverlayIfShown()
-            return
+            return@runOnUiThread
         }
 
         if (allowanceTracker.isExhausted()) {
@@ -96,6 +97,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadAsset(name: String): String =
         assets.open(name).bufferedReader().use { it.readText() }
+
+    override fun onPause() {
+        super.onPause()
+        stopCountdown()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lastKnownPath?.let { onRouteChanged(it) }
+    }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
