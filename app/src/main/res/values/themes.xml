@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.IGBlock" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
