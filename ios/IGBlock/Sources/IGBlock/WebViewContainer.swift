@@ -38,6 +38,17 @@ struct WebViewContainer: UIViewRepresentable {
         // provide no native chrome of our own and rely entirely on Instagram's own
         // in-page navigation, which isn't always sufficient on its own.
         webView.allowsBackForwardNavigationGestures = true
+        // Lock the page to exact 1:1 rendering. Without this, the page can render at
+        // a zoomed-out scale (e.g. if its viewport meta isn't being honored the way
+        // real Safari would, or pinch-zoom state gets stuck) — which shrinks
+        // everything visually AND desyncs where a button visually appears from where
+        // its actual tap target is, since WebKit's hit-testing operates in the page's
+        // own zoomed coordinate space. Forcing scale to 1.0 makes visual position and
+        // touch position match exactly, regardless of what the page's own viewport
+        // meta tag does or doesn't declare.
+        webView.scrollView.minimumZoomScale = 1.0
+        webView.scrollView.maximumZoomScale = 1.0
+        webView.scrollView.bouncesZoom = false
         onWebViewCreated(webView)
         // Belt-and-suspenders route detection: the JS shim's pushState/replaceState
         // patching can be silently overridden if Instagram's own SPA router captures
