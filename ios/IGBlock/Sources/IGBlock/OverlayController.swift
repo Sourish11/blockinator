@@ -1,5 +1,6 @@
 import WebKit
 
+@MainActor
 enum OverlayController {
     private static let overlayElementID = "igblock-overlay"
 
