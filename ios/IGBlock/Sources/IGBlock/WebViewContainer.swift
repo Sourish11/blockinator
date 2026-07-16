@@ -26,6 +26,11 @@ struct WebViewContainer: UIViewRepresentable {
         configuration.websiteDataStore = .default()
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        // Instagram serves a different (often broken/desktop-ish) layout to WebViews
+        // it detects aren't real mobile Safari. WKWebView's default UA doesn't always
+        // read as "real Safari" to sites doing this kind of sniffing, so we spoof a
+        // current iPhone Safari UA explicitly to get the real mobile experience.
+        webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
         onWebViewCreated(webView)
         // Belt-and-suspenders route detection: the JS shim's pushState/replaceState
         // patching can be silently overridden if Instagram's own SPA router captures
