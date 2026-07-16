@@ -1,8 +1,10 @@
 package com.sourish.igblock
 
 import android.os.Bundle
+import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -20,8 +22,24 @@ class MainActivity : AppCompatActivity() {
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
+        webView.addJavascriptInterface(RouteBridge { path -> onRouteChanged(path) }, "AndroidBridge")
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String?) {
+                super.onPageFinished(view, url)
+                view.evaluateJavascript(loadAsset("route_shim.js"), null)
+            }
+        }
+
         webView.loadUrl("https://www.instagram.com")
     }
+
+    private fun onRouteChanged(path: String) {
+        Log.d("MainActivity", "current path: $path")
+    }
+
+    private fun loadAsset(name: String): String =
+        assets.open(name).bufferedReader().use { it.readText() }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
