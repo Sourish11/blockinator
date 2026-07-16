@@ -26,11 +26,18 @@ struct WebViewContainer: UIViewRepresentable {
         configuration.websiteDataStore = .default()
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
-        // Instagram serves a different (often broken/desktop-ish) layout to WebViews
-        // it detects aren't real mobile Safari. WKWebView's default UA doesn't always
-        // read as "real Safari" to sites doing this kind of sniffing, so we spoof a
-        // current iPhone Safari UA explicitly to get the real mobile experience.
-        webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+        // Instagram serves a different (often broken/desktop-ish/degraded) layout to
+        // WebViews it detects aren't real mobile Safari, and it also does version-aware
+        // content negotiation — an outdated OS/Safari version in the UA can get served
+        // an older, simplified template. Spoof a UA matching the device's ACTUAL iOS
+        // version (checked directly via `ideviceinfo`, not assumed) to get the real,
+        // current mobile experience.
+        webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7.1 Mobile/15E148 Safari/604.1"
+        // Real Safari lets you swipe from the left edge to go back — without this,
+        // there's no way to navigate "back" out of a section (e.g. DMs) since we
+        // provide no native chrome of our own and rely entirely on Instagram's own
+        // in-page navigation, which isn't always sufficient on its own.
+        webView.allowsBackForwardNavigationGestures = true
         onWebViewCreated(webView)
         // Belt-and-suspenders route detection: the JS shim's pushState/replaceState
         // patching can be silently overridden if Instagram's own SPA router captures
