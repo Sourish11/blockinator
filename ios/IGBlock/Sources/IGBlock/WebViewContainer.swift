@@ -6,6 +6,10 @@ struct WebViewContainer: UIViewRepresentable {
     let onWebViewCreated: (WKWebView) -> Void
     let onRoute: (String) -> Void
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onRoute: onRoute)
+    }
+
     func makeUIView(context: Context) -> WKWebView {
         let contentController = WKUserContentController()
         contentController.add(RouteBridge(onRoute: onRoute), name: "RouteBridge")
@@ -23,11 +27,38 @@ struct WebViewContainer: UIViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         onWebViewCreated(webView)
+        // Belt-and-suspenders route detection: the JS shim's pushState/replaceState
+        // patching can be silently overridden if Instagram's own SPA router captures
+        // and reassigns history.pushState after our WKUserScript runs. WKWebView's own
+        // `url` property is updated by WebKit at the engine level for ALL navigation,
+        // including client-side route changes, independent of whatever the page's JS
+        // does to the history API — so it's a more reliable signal than the JS shim
+        // alone. Both report the same path; onRouteChanged is idempotent per-path.
+        context.coordinator.observe(webView)
         webView.load(URLRequest(url: URL(string: "https://www.instagram.com")!))
         return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
+
+    @MainActor
+    final class Coordinator: NSObject {
+        private let onRoute: (String) -> Void
+        private var observation: NSKeyValueObservation?
+
+        init(onRoute: @escaping (String) -> Void) {
+            self.onRoute = onRoute
+        }
+
+        func observe(_ webView: WKWebView) {
+            observation = webView.observe(\.url, options: [.new]) { [weak self] _, change in
+                Task { @MainActor [weak self] in
+                    guard let url = change.newValue ?? nil else { return }
+                    self?.onRoute(url.path)
+                }
+            }
+        }
+    }
 }
 
 @MainActor
