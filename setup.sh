@@ -110,6 +110,35 @@ ensure_xtool() {
   echo "xtool installed to $target_dir/xtool"
 }
 
+apple_setup_is_configured() {
+  xtool auth status 2>&1 | grep -q "^Logged in\." && \
+  xtool sdk status 2>&1 | grep -q "^Installed at "
+}
+
+ensure_apple_setup() {
+  if apple_setup_is_configured; then
+    echo "Apple auth and Darwin SDK already configured."
+    return 0
+  fi
+  cat <<'EOF'
+xtool needs a one-time Apple setup that only you can do (needs your own Apple ID):
+
+1. Download Xcode.xip from https://developer.apple.com/download/ (free Apple ID, any browser -- you do NOT need to install or run Xcode, just download the .xip)
+2. Note: the Xcode and Swift versions must match, or xtool will fail with a cryptic "cannot find type 'Swift' in scope" error. Swift 6.2 pairs with the Xcode 26.x line.
+3. Once downloaded, press Enter and this script will run `xtool setup`, which will interactively ask for your Apple ID login and the path to the .xip you just downloaded.
+
+Press Enter when ready...
+EOF
+  read -r _
+  xtool setup
+  if apple_setup_is_configured; then
+    echo "Apple auth and Darwin SDK configured successfully."
+  else
+    echo "xtool setup did not finish successfully. Run 'xtool auth status' and 'xtool sdk status' yourself to see what's missing, then re-run this script." >&2
+    return 1
+  fi
+}
+
 main() {
   echo "main not yet implemented"
 }
