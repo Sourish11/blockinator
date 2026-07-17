@@ -160,8 +160,31 @@ ensure_device_paired() {
   return 1
 }
 
+build_and_install() {
+  ( cd "$REPO_ROOT/ios/IGBlock" && xtool dev )
+}
+
 main() {
-  echo "main not yet implemented"
+  os="$(detect_os)"
+  if [ "$os" = "unknown" ]; then
+    echo "Unsupported OS. This script supports Linux, macOS, and Windows via WSL." >&2
+    echo "If you're on native Windows, install WSL (https://learn.microsoft.com/windows/wsl/install) and re-run this script inside it." >&2
+    exit 1
+  fi
+
+  if [ "$os" = "linux" ] && is_wsl; then
+    echo "⚠️  Running under WSL. This path is less tested than native Linux -- please open an issue at https://github.com/Sourish11/blockinator if something breaks."
+  elif [ "$os" = "macos" ]; then
+    echo "⚠️  Running on macOS. This path is less tested than native Linux -- please open an issue at https://github.com/Sourish11/blockinator if something breaks."
+  fi
+
+  ensure_swift
+  ensure_xtool "$HOME/.local/bin"
+  PATH="$HOME/.local/bin:$PATH"
+  export PATH
+  ensure_apple_setup
+  ensure_device_paired
+  build_and_install
 }
 
 if [ "${SETUP_SH_SOURCED:-0}" != "1" ]; then
