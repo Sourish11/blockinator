@@ -139,6 +139,27 @@ EOF
   fi
 }
 
+ensure_device_paired() {
+  attempt=1
+  max_attempts=2
+  while [ "$attempt" -le "$max_attempts" ]; do
+    echo "Connect your iPhone via USB, unlock it, and tap 'Trust This Computer' if prompted."
+    printf 'Press Enter when your phone is connected and trusted...'
+    read -r _
+    if idevice_id -l 2>/dev/null | grep -q .; then
+      echo "Device detected: $(idevice_id -l)"
+      return 0
+    fi
+    echo "No device detected yet."
+    attempt=$((attempt + 1))
+  done
+  echo "Still no device detected after $max_attempts attempts. Troubleshooting:" >&2
+  echo "  - Run 'idevicepair validate' to check pairing status" >&2
+  echo "  - Try unplugging and replugging the USB cable" >&2
+  echo "  - Make sure the phone is unlocked when you connect it" >&2
+  return 1
+}
+
 main() {
   echo "main not yet implemented"
 }
