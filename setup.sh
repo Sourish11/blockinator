@@ -37,14 +37,14 @@ install_swift_toolchain() {
   tmp_dir="$(mktemp -d)"
   if [ "$os" = "linux" ]; then
     ( cd "$tmp_dir" && \
-      curl -O "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" && \
+      curl -fO "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" && \
       tar zxf "swiftly-$(uname -m).tar.gz" && \
       ./swiftly init --quiet-shell-followup )
     # shellcheck disable=SC1091
     . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
   elif [ "$os" = "macos" ]; then
     ( cd "$tmp_dir" && \
-      curl -O "https://download.swift.org/swiftly/darwin/swiftly.pkg" && \
+      curl -fO "https://download.swift.org/swiftly/darwin/swiftly.pkg" && \
       installer -pkg swiftly.pkg -target CurrentUserHomeDirectory && \
       "$HOME/.swiftly/bin/swiftly" init --quiet-shell-followup )
     # shellcheck disable=SC1091
@@ -140,6 +140,15 @@ EOF
 }
 
 ensure_device_paired() {
+  if ! command -v idevice_id >/dev/null 2>&1; then
+    echo "'idevice_id' (from libimobiledevice) is not installed -- this script needs it to detect your iPhone over USB." >&2
+    echo "Install it via your package manager, e.g.:" >&2
+    echo "  Fedora:        sudo dnf install libimobiledevice-utils" >&2
+    echo "  Debian/Ubuntu: sudo apt install libimobiledevice-utils" >&2
+    echo "  macOS:         brew install libimobiledevice" >&2
+    echo "Then re-run this script." >&2
+    return 1
+  fi
   attempt=1
   max_attempts=2
   while [ "$attempt" -le "$max_attempts" ]; do
