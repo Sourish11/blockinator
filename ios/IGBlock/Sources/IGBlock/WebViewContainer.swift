@@ -77,6 +77,9 @@ struct WebViewContainer: UIViewRepresentable {
             observation = webView.observe(\.url, options: [.new]) { [weak self] _, change in
                 Task { @MainActor [weak self] in
                     guard let url = change.newValue ?? nil else { return }
+                    #if DEBUG
+                    NSLog("[IGBLOCK-DIAG] KVO webView.url changed, path=\(url.path)")
+                    #endif
                     self?.onRoute(url.path)
                 }
             }
@@ -91,6 +94,17 @@ final class AppState: ObservableObject {
     private var overlayShown = false
     private weak var webView: WKWebView?
     private var lastKnownPath: String?
+    // Sticky flag: once a route change lands on a genuinely restricted path
+    // (/reels/, /explore/), this stays true across subsequent navigation within the
+    // "reels family" (including the singular /reel/<id>/ pattern) — e.g. tapping into
+    // an individual full-screen reel from within the Reels tab — so that browsing
+    // individual reels reached FROM an already-restricted session still counts against
+    // the allowance, regardless of what URL segment that per-reel view happens to use.
+    // It only clears once the user reaches a path outside the reels family entirely
+    // (DMs, profile, home, search, ...). A reel opened directly via a DM/profile link,
+    // without ever passing through /reels/ or /explore/ first, never sets this flag,
+    // so it correctly stays unrestricted — the deliberate DM-shared-reel exception.
+    private var inReelsSession = false
 
     func attach(webView: WKWebView) {
         self.webView = webView
@@ -100,7 +114,25 @@ final class AppState: ObservableObject {
         lastKnownPath = path
         tracker.resetIfNewDay()
 
-        guard RouteClassifier.isRestricted(path: path) else {
+        let baseRestricted = RouteClassifier.isRestricted(path: path)
+        let partOfReelsSession = RouteClassifier.isPartOfReelsSession(path: path)
+
+        let restricted: Bool
+        if baseRestricted {
+            inReelsSession = true
+            restricted = true
+        } else if partOfReelsSession && inReelsSession {
+            restricted = true
+        } else {
+            inReelsSession = false
+            restricted = false
+        }
+
+        #if DEBUG
+        NSLog("[IGBLOCK-DIAG] onRouteChanged path=\(path) baseRestricted=\(baseRestricted) partOfReelsSession=\(partOfReelsSession) inReelsSession=\(inReelsSession) restricted=\(restricted) exhausted=\(tracker.isExhausted()) remaining=\(tracker.remainingSeconds())")
+        #endif
+
+        guard restricted else {
             stopCountdown()
             hideOverlayIfShown()
             return
@@ -129,11 +161,22 @@ final class AppState: ObservableObject {
     }
 
     private func startCountdown() {
-        guard countdownTimer == nil else { return }
+        guard countdownTimer == nil else {
+            #if DEBUG
+            NSLog("[IGBLOCK-DIAG] startCountdown: already running, skipping")
+            #endif
+            return
+        }
+        #if DEBUG
+        NSLog("[IGBLOCK-DIAG] startCountdown: starting new timer, remaining=\(tracker.remainingSeconds())")
+        #endif
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.tracker.consumeSecond()
+                #if DEBUG
+                NSLog("[IGBLOCK-DIAG] tick: remaining=\(self.tracker.remainingSeconds())")
+                #endif
                 if self.tracker.isExhausted() {
                     self.stopCountdown()
                     self.showOverlayIfNotShown()
@@ -148,6 +191,9 @@ final class AppState: ObservableObject {
     }
 
     private func showOverlayIfNotShown() {
+        #if DEBUG
+        NSLog("[IGBLOCK-DIAG] showOverlayIfNotShown called: overlayShown=\(overlayShown) webViewIsNil=\(webView == nil)")
+        #endif
         guard !overlayShown, let webView else { return }
         OverlayController.show(in: webView)
         overlayShown = true

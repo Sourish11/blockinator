@@ -8,6 +8,9 @@ final class RouteBridge: NSObject, WKScriptMessageHandler {
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        #if DEBUG
+        NSLog("[IGBLOCK-DIAG] RouteBridge received message.body=\(message.body), asString=\(message.body as? String ?? "nil")")
+        #endif
         guard let path = message.body as? String else { return }
         onRoute(path)
     }
