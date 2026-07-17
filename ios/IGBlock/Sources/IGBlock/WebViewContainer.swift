@@ -24,11 +24,16 @@ struct WebViewContainer: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = contentController
         configuration.websiteDataStore = .default()
-        // Without these, video in a WebView typically needs an explicit tap before it
-        // plays, and can fall back to a less fluid, JS-emulated fullscreen instead of
-        // WebKit's native fullscreen transition — both make Reels feel noticeably
-        // clunkier than the native app's instant-autoplay, smoothly-animated feed.
-        configuration.mediaTypesRequiringUserActionForPlayback = []
+        // NOTE: previously also set `mediaTypesRequiringUserActionForPlayback = []` to
+        // make video autoplay instantly like the native app. Reverted: forcing every
+        // reel to start decoding video the instant it scrolls into view (rather than
+        // gating on a tap) measurably increased how often WebKit's content process got
+        // killed for memory pressure during extended Reels scrolling (confirmed
+        // on-device: crashes became consistent around ~15s instead of intermittent).
+        // This app's whole purpose is being a deliberate friction point, not matching
+        // the native app's addictiveness — reliability wins over that specific polish.
+        // allowsInlineMediaPlayback is kept: it doesn't affect how many videos start
+        // decoding at once, just whether video plays inline vs. force-fullscreen.
         configuration.allowsInlineMediaPlayback = true
         let webpagePreferences = WKWebpagePreferences()
         webpagePreferences.preferredContentMode = .mobile
