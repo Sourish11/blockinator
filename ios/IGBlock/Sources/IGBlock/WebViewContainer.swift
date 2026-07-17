@@ -49,6 +49,12 @@ struct WebViewContainer: UIViewRepresentable {
         webView.scrollView.minimumZoomScale = 1.0
         webView.scrollView.maximumZoomScale = 1.0
         webView.scrollView.bouncesZoom = false
+        // Heavy autoplaying video (exactly what Reels is) can push WebKit's content
+        // process over its memory budget, causing iOS to kill it outright. Without a
+        // navigation delegate to catch that, the WebView is left permanently blank
+        // (black/white screen) with no way to recover short of force-quitting the app.
+        // Reloading on termination is the standard, documented recovery.
+        webView.navigationDelegate = context.coordinator
         onWebViewCreated(webView)
         // Belt-and-suspenders route detection: the JS shim's pushState/replaceState
         // patching can be silently overridden if Instagram's own SPA router captures
@@ -65,7 +71,7 @@ struct WebViewContainer: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
     @MainActor
-    final class Coordinator: NSObject {
+    final class Coordinator: NSObject, WKNavigationDelegate {
         private let onRoute: (String) -> Void
         private var observation: NSKeyValueObservation?
 
@@ -84,6 +90,13 @@ struct WebViewContainer: UIViewRepresentable {
                 }
             }
         }
+
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            #if DEBUG
+            NSLog("[IGBLOCK-DIAG] WebContent process terminated (likely memory pressure) — reloading")
+            #endif
+            webView.reload()
+        }
     }
 }
 
@@ -94,17 +107,11 @@ final class AppState: ObservableObject {
     private var overlayShown = false
     private weak var webView: WKWebView?
     private var lastKnownPath: String?
-    // Sticky flag: once a route change lands on a genuinely restricted path
-    // (/reels/, /explore/), this stays true across subsequent navigation within the
-    // "reels family" (including the singular /reel/<id>/ pattern) — e.g. tapping into
-    // an individual full-screen reel from within the Reels tab — so that browsing
-    // individual reels reached FROM an already-restricted session still counts against
-    // the allowance, regardless of what URL segment that per-reel view happens to use.
-    // It only clears once the user reaches a path outside the reels family entirely
-    // (DMs, profile, home, search, ...). A reel opened directly via a DM/profile link,
-    // without ever passing through /reels/ or /explore/ first, never sets this flag,
-    // so it correctly stays unrestricted — the deliberate DM-shared-reel exception.
-    private var inReelsSession = false
+    // See ReelsSessionTracker in IGBlockCore: allows the one specific reel someone
+    // sends you directly (never having visited /reels/ or /explore/ first), but starts
+    // counting the moment a DIFFERENT reel appears while still in reel territory —
+    // i.e. swiping onward into the algorithmic feed, not watching what was sent.
+    private var reelsSession = ReelsSessionTracker()
 
     func attach(webView: WKWebView) {
         self.webView = webView
@@ -114,22 +121,10 @@ final class AppState: ObservableObject {
         lastKnownPath = path
         tracker.resetIfNewDay()
 
-        let baseRestricted = RouteClassifier.isRestricted(path: path)
-        let partOfReelsSession = RouteClassifier.isPartOfReelsSession(path: path)
-
-        let restricted: Bool
-        if baseRestricted {
-            inReelsSession = true
-            restricted = true
-        } else if partOfReelsSession && inReelsSession {
-            restricted = true
-        } else {
-            inReelsSession = false
-            restricted = false
-        }
+        let restricted = reelsSession.update(path: path)
 
         #if DEBUG
-        NSLog("[IGBLOCK-DIAG] onRouteChanged path=\(path) baseRestricted=\(baseRestricted) partOfReelsSession=\(partOfReelsSession) inReelsSession=\(inReelsSession) restricted=\(restricted) exhausted=\(tracker.isExhausted()) remaining=\(tracker.remainingSeconds())")
+        NSLog("[IGBLOCK-DIAG] onRouteChanged path=\(path) inSession=\(reelsSession.inSession) restricted=\(restricted) exhausted=\(tracker.isExhausted()) remaining=\(tracker.remainingSeconds())")
         #endif
 
         guard restricted else {
