@@ -13,6 +13,17 @@ No server, no analytics, no account. Your Instagram session and traffic go strai
 
 The plan is to bring both platforms to full parity and matching behavior over time — right now iOS is the one that's actually been used and hardened against real Instagram behavior.
 
+## Quick start
+
+```bash
+git clone https://github.com/Sourish11/blockinator.git
+cd blockinator
+./setup.sh          # iOS: installs Swift + xtool, guides the Apple/device steps, builds and installs
+./setup-android.sh  # Android: checks/points at your Android SDK, builds and installs
+```
+
+`setup.sh` automates everything that can be automated and pauses with clear instructions for the handful of steps that genuinely require your own action (an Apple ID login, downloading `Xcode.xip`, tapping "Trust This Computer" on your phone). It's the recommended way to get started — the manual steps below are the same underlying process, documented in full for reference or if the script doesn't work on your setup.
+
 ## How it works
 
 - **Route detection:** Instagram is a single-page app, so a small JS shim patches `history.pushState`/`replaceState` and reports the current path back to native code (a `@JavascriptInterface` bridge on Android, a `WKScriptMessageHandler` on iOS). iOS also cross-checks against `WKWebView`'s own `url` property as a more robust fallback, since a site's own JS can silently override a patched `pushState`.
