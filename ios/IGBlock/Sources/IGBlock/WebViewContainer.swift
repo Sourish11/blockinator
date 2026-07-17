@@ -24,16 +24,15 @@ struct WebViewContainer: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = contentController
         configuration.websiteDataStore = .default()
-        // NOTE: previously also set `mediaTypesRequiringUserActionForPlayback = []` to
-        // make video autoplay instantly like the native app. Reverted: forcing every
-        // reel to start decoding video the instant it scrolls into view (rather than
-        // gating on a tap) measurably increased how often WebKit's content process got
-        // killed for memory pressure during extended Reels scrolling (confirmed
-        // on-device: crashes became consistent around ~15s instead of intermittent).
-        // This app's whole purpose is being a deliberate friction point, not matching
-        // the native app's addictiveness — reliability wins over that specific polish.
-        // allowsInlineMediaPlayback is kept: it doesn't affect how many videos start
-        // decoding at once, just whether video plays inline vs. force-fullscreen.
+        // Instant autoplay, matching the native app. Trade-off (deliberate, per
+        // product decision): this does increase how often WebKit's content process
+        // gets killed for memory pressure during extended Reels scrolling, since every
+        // reel starts decoding video the instant it's in view rather than gating on a
+        // tap. The friction this app adds is meant to target the scrolling itself, not
+        // degrade Instagram's actual playback quality — so autoplay stays on, and the
+        // crash is handled via recovery (see webViewWebContentProcessDidTerminate)
+        // instead of disabling the feature that triggers it more often.
+        configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.allowsInlineMediaPlayback = true
         let webpagePreferences = WKWebpagePreferences()
         webpagePreferences.preferredContentMode = .mobile
@@ -106,10 +105,17 @@ struct WebViewContainer: UIViewRepresentable {
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            // Reload the site root rather than `webView.reload()` (which retries the
+            // exact URL that was loaded when the crash happened). A deep client-side
+            // route like /reels/<id>/ is only meaningful as a pushState destination
+            // within a live SPA session -- hitting it as a fresh, real HTTP GET (which
+            // is what a genuine reload after a process kill is) isn't the same
+            // situation the SPA router expects, and can redirect somewhere unpredictable.
+            // Reloading the root is the one URL guaranteed to load cleanly.
             #if DEBUG
-            NSLog("[IGBLOCK-DIAG] WebContent process terminated (likely memory pressure) — reloading")
+            NSLog("[IGBLOCK-DIAG] WebContent process terminated (likely memory pressure) — reloading site root")
             #endif
-            webView.reload()
+            webView.load(URLRequest(url: URL(string: "https://www.instagram.com")!))
         }
     }
 }
