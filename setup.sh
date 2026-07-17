@@ -71,6 +71,45 @@ ensure_swift() {
   echo "Swift installed: $(swift --version 2>&1 | head -1)"
 }
 
+install_xtool_binary() {
+  target_dir="$1"
+  os="$(detect_os)"
+  arch="$(detect_arch)"
+  mkdir -p "$target_dir"
+  if [ "$os" = "linux" ]; then
+    if [ "$arch" = "unknown" ]; then
+      echo "Unsupported architecture for xtool auto-install: $(uname -m)" >&2
+      return 1
+    fi
+    url="https://github.com/xtool-org/xtool/releases/latest/download/xtool-${arch}.AppImage"
+    curl -fL -o "$target_dir/xtool" "$url"
+    chmod +x "$target_dir/xtool"
+  elif [ "$os" = "macos" ]; then
+    url="https://github.com/xtool-org/xtool/releases/latest/download/xtool.app.zip"
+    curl -fL -o "$target_dir/xtool.app.zip" "$url"
+    ( cd "$target_dir" && unzip -q -o xtool.app.zip )
+    ln -sf "$target_dir/xtool.app/Contents/MacOS/xtool" "$target_dir/xtool"
+  else
+    echo "Unsupported OS for xtool auto-install: $os" >&2
+    return 1
+  fi
+  if [ ! -x "$target_dir/xtool" ]; then
+    echo "xtool install failed — no executable found at $target_dir/xtool" >&2
+    return 1
+  fi
+}
+
+ensure_xtool() {
+  target_dir="$1"
+  if command -v xtool >/dev/null 2>&1; then
+    echo "xtool already installed: $(xtool --version 2>&1)"
+    return 0
+  fi
+  echo "xtool not found — downloading to $target_dir..."
+  install_xtool_binary "$target_dir"
+  echo "xtool installed to $target_dir/xtool"
+}
+
 main() {
   echo "main not yet implemented"
 }
