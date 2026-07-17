@@ -24,6 +24,15 @@ struct WebViewContainer: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = contentController
         configuration.websiteDataStore = .default()
+        // Without these, video in a WebView typically needs an explicit tap before it
+        // plays, and can fall back to a less fluid, JS-emulated fullscreen instead of
+        // WebKit's native fullscreen transition — both make Reels feel noticeably
+        // clunkier than the native app's instant-autoplay, smoothly-animated feed.
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+        configuration.allowsInlineMediaPlayback = true
+        let webpagePreferences = WKWebpagePreferences()
+        webpagePreferences.preferredContentMode = .mobile
+        configuration.defaultWebpagePreferences = webpagePreferences
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         // Instagram serves a different (often broken/desktop-ish/degraded) layout to
