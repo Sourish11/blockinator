@@ -122,7 +122,8 @@ struct WebViewContainer: UIViewRepresentable {
 
 @MainActor
 final class AppState: ObservableObject {
-    private let tracker = AllowanceTracker(store: UserDefaultsAllowanceStore())
+    private var settingsStore: SettingsStore
+    private let tracker: AllowanceTracker
     private var countdownTimer: Timer?
     private var overlayShown = false
     private weak var webView: WKWebView?
@@ -133,6 +134,33 @@ final class AppState: ObservableObject {
     // i.e. swiping onward into the algorithmic feed, not watching what was sent.
     private var reelsSession = ReelsSessionTracker()
 
+    // Bound directly by SettingsView's Stepper/Toggles. didSet writes through to
+    // settingsStore (persisted) and, for the allowance, applies immediately to the
+    // running countdown rather than waiting for tomorrow's reset.
+    @Published var dailyAllowanceMinutes: Int {
+        didSet {
+            settingsStore.dailyAllowanceMinutes = dailyAllowanceMinutes
+            tracker.applyNewDailyAllowance(dailyAllowanceMinutes * 60)
+        }
+    }
+    @Published var isReelsRestricted: Bool {
+        didSet { settingsStore.isReelsRestricted = isReelsRestricted }
+    }
+    @Published var isExploreRestricted: Bool {
+        didSet { settingsStore.isExploreRestricted = isExploreRestricted }
+    }
+
+    init(settingsStore: SettingsStore = UserDefaultsSettingsStore()) {
+        self.settingsStore = settingsStore
+        self.dailyAllowanceMinutes = settingsStore.dailyAllowanceMinutes
+        self.isReelsRestricted = settingsStore.isReelsRestricted
+        self.isExploreRestricted = settingsStore.isExploreRestricted
+        self.tracker = AllowanceTracker(
+            store: UserDefaultsAllowanceStore(),
+            dailyAllowanceSeconds: { settingsStore.dailyAllowanceMinutes * 60 }
+        )
+    }
+
     func attach(webView: WKWebView) {
         self.webView = webView
     }
@@ -141,7 +169,8 @@ final class AppState: ObservableObject {
         lastKnownPath = path
         tracker.resetIfNewDay()
 
-        let restricted = reelsSession.update(path: path)
+        let enabledSections = settingsStore.enabledSections
+        let restricted = reelsSession.update(path: path, enabledSections: enabledSections)
 
         #if DEBUG
         NSLog("[IGBLOCK-DIAG] onRouteChanged path=\(path) inSession=\(reelsSession.inSession) restricted=\(restricted) exhausted=\(tracker.isExhausted()) remaining=\(tracker.remainingSeconds())")
