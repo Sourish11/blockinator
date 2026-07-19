@@ -2,29 +2,41 @@ import XCTest
 @testable import IGBlockCore
 
 final class RouteClassifierTests: XCTestCase {
+    private let bothEnabled: Set<RestrictedSection> = [.reels, .explore]
+
     func testReelsTabIsRestricted() {
-        XCTAssertTrue(RouteClassifier.isRestricted(path: "/reels/"))
+        XCTAssertTrue(RouteClassifier.isRestricted(path: "/reels/", enabledSections: bothEnabled))
     }
     func testExploreTabIsRestricted() {
-        XCTAssertTrue(RouteClassifier.isRestricted(path: "/explore/"))
+        XCTAssertTrue(RouteClassifier.isRestricted(path: "/explore/", enabledSections: bothEnabled))
     }
     func testExploreSubPathIsRestricted() {
-        XCTAssertTrue(RouteClassifier.isRestricted(path: "/explore/tags/travel/"))
+        XCTAssertTrue(RouteClassifier.isRestricted(path: "/explore/tags/travel/", enabledSections: bothEnabled))
     }
     func testSingleReelPermalinkIsNotRestricted() {
-        XCTAssertFalse(RouteClassifier.isRestricted(path: "/reel/CxYzAbC123/"))
+        XCTAssertFalse(RouteClassifier.isRestricted(path: "/reel/CxYzAbC123/", enabledSections: bothEnabled))
     }
     func testPostPermalinkIsNotRestricted() {
-        XCTAssertFalse(RouteClassifier.isRestricted(path: "/p/CxYzAbC123/"))
+        XCTAssertFalse(RouteClassifier.isRestricted(path: "/p/CxYzAbC123/", enabledSections: bothEnabled))
     }
     func testDirectMessagesAreNotRestricted() {
-        XCTAssertFalse(RouteClassifier.isRestricted(path: "/direct/inbox/"))
+        XCTAssertFalse(RouteClassifier.isRestricted(path: "/direct/inbox/", enabledSections: bothEnabled))
     }
     func testProfilePageIsNotRestricted() {
-        XCTAssertFalse(RouteClassifier.isRestricted(path: "/someusername/"))
+        XCTAssertFalse(RouteClassifier.isRestricted(path: "/someusername/", enabledSections: bothEnabled))
     }
     func testHomeFeedIsNotRestricted() {
-        XCTAssertFalse(RouteClassifier.isRestricted(path: "/"))
+        XCTAssertFalse(RouteClassifier.isRestricted(path: "/", enabledSections: bothEnabled))
+    }
+    func testReelsTabIsNotRestrictedWhenReelsSectionDisabled() {
+        XCTAssertFalse(RouteClassifier.isRestricted(path: "/reels/", enabledSections: [.explore]))
+    }
+    func testExploreTabIsNotRestrictedWhenExploreSectionDisabled() {
+        XCTAssertFalse(RouteClassifier.isRestricted(path: "/explore/", enabledSections: [.reels]))
+    }
+    func testNothingIsRestrictedWhenNoSectionsEnabled() {
+        XCTAssertFalse(RouteClassifier.isRestricted(path: "/reels/", enabledSections: []))
+        XCTAssertFalse(RouteClassifier.isRestricted(path: "/explore/", enabledSections: []))
     }
 
     // isPartOfReelsSession: used to keep a user "counted" while browsing individual
@@ -33,24 +45,30 @@ final class RouteClassifierTests: XCTestCase {
     // broader membership check than isRestricted — it does NOT by itself mean "block
     // this route"; AppState combines it with session state to decide that.
     func testReelsTabIsPartOfReelsSession() {
-        XCTAssertTrue(RouteClassifier.isPartOfReelsSession(path: "/reels/"))
+        XCTAssertTrue(RouteClassifier.isPartOfReelsSession(path: "/reels/", enabledSections: bothEnabled))
     }
     func testExploreTabIsPartOfReelsSession() {
-        XCTAssertTrue(RouteClassifier.isPartOfReelsSession(path: "/explore/"))
+        XCTAssertTrue(RouteClassifier.isPartOfReelsSession(path: "/explore/", enabledSections: bothEnabled))
     }
     func testSingleReelPermalinkIsPartOfReelsSession() {
-        XCTAssertTrue(RouteClassifier.isPartOfReelsSession(path: "/reel/CxYzAbC123/"))
+        XCTAssertTrue(RouteClassifier.isPartOfReelsSession(path: "/reel/CxYzAbC123/", enabledSections: bothEnabled))
     }
     func testDirectMessagesAreNotPartOfReelsSession() {
-        XCTAssertFalse(RouteClassifier.isPartOfReelsSession(path: "/direct/inbox/"))
+        XCTAssertFalse(RouteClassifier.isPartOfReelsSession(path: "/direct/inbox/", enabledSections: bothEnabled))
     }
     func testProfilePageIsNotPartOfReelsSession() {
-        XCTAssertFalse(RouteClassifier.isPartOfReelsSession(path: "/someusername/"))
+        XCTAssertFalse(RouteClassifier.isPartOfReelsSession(path: "/someusername/", enabledSections: bothEnabled))
     }
     func testHomeFeedIsNotPartOfReelsSession() {
-        XCTAssertFalse(RouteClassifier.isPartOfReelsSession(path: "/"))
+        XCTAssertFalse(RouteClassifier.isPartOfReelsSession(path: "/", enabledSections: bothEnabled))
     }
     func testPostPermalinkIsNotPartOfReelsSession() {
-        XCTAssertFalse(RouteClassifier.isPartOfReelsSession(path: "/p/CxYzAbC123/"))
+        XCTAssertFalse(RouteClassifier.isPartOfReelsSession(path: "/p/CxYzAbC123/", enabledSections: bothEnabled))
+    }
+    func testSingleReelPermalinkIsNotPartOfReelsSessionWhenReelsSectionDisabled() {
+        XCTAssertFalse(RouteClassifier.isPartOfReelsSession(path: "/reel/CxYzAbC123/", enabledSections: [.explore]))
+    }
+    func testExploreTabIsNotPartOfReelsSessionWhenExploreSectionDisabled() {
+        XCTAssertFalse(RouteClassifier.isPartOfReelsSession(path: "/explore/", enabledSections: [.reels]))
     }
 }
