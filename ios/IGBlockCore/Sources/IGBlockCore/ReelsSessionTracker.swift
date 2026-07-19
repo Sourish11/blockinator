@@ -21,8 +21,7 @@ public struct ReelsSessionTracker {
     /// Call on every route change. Returns whether the new path should count against
     /// the allowance, and updates internal state for the next call.
     @discardableResult
-    public mutating func update(path: String) -> Bool {
-        let enabledSections: Set<RestrictedSection> = [.reels, .explore]
+    public mutating func update(path: String, enabledSections: Set<RestrictedSection>) -> Bool {
         let baseRestricted = RouteClassifier.isRestricted(path: path, enabledSections: enabledSections)
         let partOfReelsSession = RouteClassifier.isPartOfReelsSession(path: path, enabledSections: enabledSections)
 
