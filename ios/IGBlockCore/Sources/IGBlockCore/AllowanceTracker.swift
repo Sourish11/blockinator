@@ -2,12 +2,12 @@ import Foundation
 
 public final class AllowanceTracker {
     private var store: AllowanceStore
-    private let dailyAllowanceSeconds: Int
+    private let dailyAllowanceSeconds: () -> Int
     private let today: () -> Date
 
     public init(
         store: AllowanceStore,
-        dailyAllowanceSeconds: Int = UserDefaultsAllowanceStore.defaultDailyAllowanceSeconds,
+        dailyAllowanceSeconds: @escaping () -> Int = { UserDefaultsAllowanceStore.defaultDailyAllowanceSeconds },
         today: @escaping () -> Date = Date.init
     ) {
         self.store = store
@@ -18,7 +18,7 @@ public final class AllowanceTracker {
     public func resetIfNewDay() {
         let todayEpochDay = Self.epochDay(for: today())
         if store.lastResetEpochDay != todayEpochDay {
-            store.remainingSeconds = dailyAllowanceSeconds
+            store.remainingSeconds = dailyAllowanceSeconds()
             store.lastResetEpochDay = todayEpochDay
         }
     }
@@ -36,6 +36,14 @@ public final class AllowanceTracker {
 
     public func remainingSeconds() -> Int {
         store.remainingSeconds
+    }
+
+    /// Applies a new daily allowance immediately, for the rest of today — not waiting
+    /// for the next day-boundary reset. Used when the user changes the duration in
+    /// Settings mid-session: their remaining time for today becomes exactly the new
+    /// limit (not adjusted by how much was already used).
+    public func applyNewDailyAllowance(_ seconds: Int) {
+        store.remainingSeconds = seconds
     }
 
     private static func epochDay(for date: Date) -> Int {

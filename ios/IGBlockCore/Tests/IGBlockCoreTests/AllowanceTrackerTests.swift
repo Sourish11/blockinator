@@ -26,7 +26,7 @@ final class AllowanceTrackerTests: XCTestCase {
     func testResetIfNewDayGrantsFullAllowanceOnFirstEverRun() {
         let store = FakeAllowanceStore()
         let fixedToday = date(2026, 7, 15)
-        let tracker = AllowanceTracker(store: store, dailyAllowanceSeconds: 900, today: { fixedToday })
+        let tracker = AllowanceTracker(store: store, dailyAllowanceSeconds: { 900 }, today: { fixedToday })
 
         tracker.resetIfNewDay()
 
@@ -35,7 +35,7 @@ final class AllowanceTrackerTests: XCTestCase {
 
     func testResetIfNewDayDoesNotTouchRemainingSecondsOnTheSameDay() {
         let store = FakeAllowanceStore(remainingSeconds: 300, lastResetEpochDay: AllowanceTrackerTests.epochDay(date(2026, 7, 15)))
-        let tracker = AllowanceTracker(store: store, dailyAllowanceSeconds: 900, today: { date(2026, 7, 15) })
+        let tracker = AllowanceTracker(store: store, dailyAllowanceSeconds: { 900 }, today: { date(2026, 7, 15) })
 
         tracker.resetIfNewDay()
 
@@ -44,11 +44,24 @@ final class AllowanceTrackerTests: XCTestCase {
 
     func testResetIfNewDayGrantsFullAllowanceAgainOnANewDay() {
         let store = FakeAllowanceStore(remainingSeconds: 0, lastResetEpochDay: AllowanceTrackerTests.epochDay(date(2026, 7, 15)))
-        let tracker = AllowanceTracker(store: store, dailyAllowanceSeconds: 900, today: { date(2026, 7, 16) })
+        let tracker = AllowanceTracker(store: store, dailyAllowanceSeconds: { 900 }, today: { date(2026, 7, 16) })
 
         tracker.resetIfNewDay()
 
         XCTAssertEqual(tracker.remainingSeconds(), 900)
+    }
+
+    func testResetIfNewDayReadsTheAllowanceClosureFreshEachTime() {
+        // Simulates the real app: dailyAllowanceSeconds reads a live setting rather
+        // than a value frozen at construction time.
+        var currentAllowance = 300
+        let store = FakeAllowanceStore(remainingSeconds: 0, lastResetEpochDay: AllowanceTrackerTests.epochDay(date(2026, 7, 15)))
+        let tracker = AllowanceTracker(store: store, dailyAllowanceSeconds: { currentAllowance }, today: { date(2026, 7, 16) })
+
+        currentAllowance = 1800
+        tracker.resetIfNewDay()
+
+        XCTAssertEqual(tracker.remainingSeconds(), 1800)
     }
 
     func testConsumeSecondDecrementsRemainingSeconds() {
@@ -77,6 +90,26 @@ final class AllowanceTrackerTests: XCTestCase {
         tracker.consumeSecond()
 
         XCTAssertTrue(tracker.isExhausted())
+    }
+
+    func testApplyNewDailyAllowanceSetsRemainingSecondsImmediately() {
+        let store = FakeAllowanceStore(remainingSeconds: 50)
+        let tracker = AllowanceTracker(store: store)
+
+        tracker.applyNewDailyAllowance(1200)
+
+        XCTAssertEqual(tracker.remainingSeconds(), 1200)
+    }
+
+    func testApplyNewDailyAllowanceDoesNotWaitForADayBoundary() {
+        let store = FakeAllowanceStore(remainingSeconds: 0, lastResetEpochDay: AllowanceTrackerTests.epochDay(date(2026, 7, 15)))
+        let tracker = AllowanceTracker(store: store, dailyAllowanceSeconds: { 900 }, today: { date(2026, 7, 15) })
+
+        tracker.applyNewDailyAllowance(600)
+        // Still the same day -- resetIfNewDay should NOT overwrite the just-applied value.
+        tracker.resetIfNewDay()
+
+        XCTAssertEqual(tracker.remainingSeconds(), 600)
     }
 
     private static func epochDay(_ date: Date) -> Int {
